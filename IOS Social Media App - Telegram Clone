@@ -1,0 +1,205 @@
+# Podfile
+platform :ios, '13.0'
+
+target 'SecureChatApp' do
+  use_frameworks!
+
+  # Pods for SecureChatApp
+  pod 'Firebase/Auth'
+  pod 'Firebase/Firestore'
+  pod 'CryptoSwift'
+end
+
+import SwiftUI
+import Firebase
+
+@main
+struct SecureChatAppApp: App {
+    init() {
+        FirebaseApp.configure()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
+import Foundation
+import CryptoSwift
+
+struct EncryptionHelper {
+    private static let key = "your-encryption-key" // Use a secure key
+    private static let iv = "your-iv-key" // Use a secure IV
+
+    static func encrypt(_ text: String) -> String? {
+        do {
+            let aes = try AES(key: key.bytes, blockMode: CBC(iv: iv.bytes), padding: .pkcs7)
+            let ciphertext = try aes.encrypt(text.bytes)
+            return ciphertext.toBase64()
+        } catch {
+            print("Encryption error: \(error)")
+            return nil
+        }
+    }
+
+    static func decrypt(_ base64String: String) -> String? {
+        do {
+            let aes = try AES(key: key.bytes, blockMode: CBC(iv: iv.bytes), padding: .pkcs7)
+            let decrypted = try aes.decrypt(Array(base64: base64String))
+            return String(bytes: decrypted, encoding: .utf8)
+        } catch {
+            print("Decryption error: \(error)")
+            return nil
+        }
+    }
+}
+
+import SwiftUI
+import FirebaseFirestore
+import FirebaseAuth
+
+struct Message: Identifiable {
+    var id: String
+    var text: String
+    var userId: String
+    var timestamp: Timestamp
+}
+
+struct ContentView: View {
+    @State private var message = ""
+    @State private var messages = [Message]()
+    private let db = Firestore.firestore()
+    private let userId = Auth.auth().currentUser?.uid ?? "Unknown"
+
+    var body: some View {
+        VStack {
+            List(messages) { message in
+                HStack {
+                    if message.userId == userId {
+                        Spacer()
+                        Text(message.text)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                            .foregroundColor(.white)
+                    } else {
+                        Text(message.text)
+                            .padding()
+                            .background(Color.gray)
+                            .cornerRadius(8)
+                            .foregroundColor(.black)
+                        Spacer()
+                    }
+                }
+            }
+            HStack {
+                TextField("Enter message", text: $message)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Button(action: sendMessage) {
+                    Text("Send")
+                }
+            }
+            .padding()
+        }
+        .onAppear(perform: loadMessages)
+    }
+
+    func sendMessage() {
+        guard !message.isEmpty else { return }
+        let encryptedMessage = EncryptionHelper.encrypt(message) ?? message
+        let messageData: [String: Any] = [
+            "text": encryptedMessage,
+            "userId": userId,
+            "timestamp": Timestamp()
+        ]
+        db.collection("messages").addDocument(data: messageData) { error in
+            if let error = error {
+                print("Error sending message: \(error)")
+            } else {
+                message = ""
+            }
+        }
+    }
+
+    func loadMessages() {
+        db.collection("messages").order(by: "timestamp").addSnapshotListener { querySnapshot, error in
+            guard let documents = querySnapshot?.documents else {
+                print("Error fetching messages: \(error!)")
+                return
+            }
+            self.messages = documents.compactMap { document -> Message? in
+                let data = document.data()
+                guard let text = data["text"] as? String,
+                      let userId = data["userId"] as? String,
+                      let timestamp = data["timestamp"] as? Timestamp else { return nil }
+                let decryptedText = EncryptionHelper.decrypt(text) ?? text
+                return Message(id: document.documentID, text: decryptedText, userId: userId, timestamp: timestamp)
+            }
+        }
+    }
+}
+
+import SwiftUI
+import FirebaseAuth
+
+struct AuthenticationView: View {
+    @State private var email = ""
+    @State private var password = ""
+    @State private var isAuthenticated = false
+
+    var body: some View {
+        if isAuthenticated {
+            ContentView()
+        } else {
+            VStack {
+                TextField("Email", text: $email)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                SecureField("Password", text: $password)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                Button(action: signIn) {
+                    Text("Sign In")
+                }
+                .padding()
+            }
+        }
+    }
+
+    func signIn() {
+        Auth.auth().signIn(withEmail: email, password: password) { authResult, error in
+            if let error = error {
+                print("Error signing in: \(error)")
+            } else {
+                isAuthenticated = true
+            }
+        }
+    }
+}
+
+struct AuthenticationView_Previews: PreviewProvider {
+    static var previews: some View {
+        AuthenticationView()
+    }
+}
+
+import SwiftUI
+import Firebase
+
+@main
+struct SecureChatAppApp: App {
+    init() {
+        FirebaseApp.configure()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            AuthenticationView()
+        }
+    }
+}
+
+    Open the .xcworkspace file in Xcode.
+    Build and run the application on a simulator or device.
