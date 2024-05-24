@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.example.tetris.GameView
+        android:id="@+id/gameView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+</FrameLayout>
+
+package com.example.tetris
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.util.AttributeSet
+import android.view.View
+
+class GameView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+    private val paint = Paint()
+    private val grid = Array(20) { IntArray(10) }
+
+    init {
+        paint.color = Color.BLACK
+        paint.style = Paint.Style.FILL
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        drawGrid(canvas)
+    }
+
+    private fun drawGrid(canvas: Canvas) {
+        val cellSize = width / 10
+        for (i in grid.indices) {
+            for (j in grid[i].indices) {
+                if (grid[i][j] == 1) {
+                    canvas.drawRect(
+                        (j * cellSize).toFloat(),
+                        (i * cellSize).toFloat(),
+                        ((j + 1) * cellSize).toFloat(),
+                        ((i + 1) * cellSize).toFloat(),
+                        paint
+                    )
+                }
+            }
+        }
+    }
+
+    // Add more game logic here (e.g., handling pieces, user input, game over conditions)
+}
+
+package com.example.tetris
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.util.AttributeSet
+import android.view.View
+
+class GameView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+    private val paint = Paint()
+    private val grid = Array(20) { IntArray(10) }
+
+    init {
+        paint.color = Color.BLACK
+        paint.style = Paint.Style.FILL
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        drawGrid(canvas)
+    }
+
+    private fun drawGrid(canvas: Canvas) {
+        val cellSize = width / 10
+        for (i in grid.indices) {
+            for (j in grid[i].indices) {
+                if (grid[i][j] == 1) {
+                    canvas.drawRect(
+                        (j * cellSize).toFloat(),
+                        (i * cellSize).toFloat(),
+                        ((j + 1) * cellSize).toFloat(),
+                        ((i + 1) * cellSize).toFloat(),
+                        paint
+                    )
+                }
+            }
+        }
+    }
+
+    // Add more game logic here (e.g., handling pieces, user input, game over conditions)
+}
+
+package com.example.tetris
+
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+    }
+}
+
+package com.example.tetris
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.os.Handler
+import android.util.AttributeSet
+import android.view.View
+
+class GameView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+    private val paint = Paint()
+    private val grid = Array(20) { IntArray(10) }
+    private val handler = Handler()
+    private val updateInterval = 500L // milliseconds
+    private var pieceX = 4
+    private var pieceY = 0
+
+    init {
+        paint.color = Color.BLACK
+        paint.style = Paint.Style.FILL
+
+        // Start the game loop
+        handler.post(updateRunnable)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        drawGrid(canvas)
+        drawPiece(canvas)
+    }
+
+    private fun drawGrid(canvas: Canvas) {
+        val cellSize = width / 10
+        for (i in grid.indices) {
+            for (j in grid[i].indices) {
+                if (grid[i][j] == 1) {
+                    canvas.drawRect(
+                        (j * cellSize).toFloat(),
+                        (i * cellSize).toFloat(),
+                        ((j + 1) * cellSize).toFloat(),
+                        ((i + 1) * cellSize).toFloat(),
+                        paint
+                    )
+                }
+            }
+        }
+    }
+
+    private fun drawPiece(canvas: Canvas) {
+        val cellSize = width / 10
+        canvas.drawRect(
+            (pieceX * cellSize).toFloat(),
+            (pieceY * cellSize).toFloat(),
+            ((pieceX + 1) * cellSize).toFloat(),
+            ((pieceY + 1) * cellSize).toFloat(),
+            paint
+        )
+    }
+
+    private val updateRunnable = object : Runnable {
+        override fun run() {
+            updateGame()
+            invalidate()
+            handler.postDelayed(this, updateInterval)
+        }
+    }
+
+    private fun updateGame() {
+        // Move the piece down
+        if (pieceY < 19) {
+            pieceY++
+        } else {
+            // Reset piece to the top for simplicity
+            pieceY = 0
+        }
+    }
+
+    // Add more game logic here (e.g., handling user input, collision detection, clearing lines)
+}
