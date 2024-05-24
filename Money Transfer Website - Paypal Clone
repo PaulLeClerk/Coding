@@ -1,0 +1,247 @@
+my-paypal-clone/
+├── public/
+│   ├── css/
+│   │   └── styles.css
+│   └── js/
+│       └── scripts.js
+├── views/
+│   ├── index.ejs
+│   ├── login.ejs
+│   ├── register.ejs
+│   └── transaction.ejs
+├── app.js
+├── package.json
+└── .env
+
+npm init -y
+npm install express ejs body-parser mongoose dotenv bcryptjs jsonwebtoken
+
+// app.js
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const app = express();
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static('public'));
+app.set('view engine', 'ejs');
+
+// Connect to MongoDB
+mongoose.connect('mongodb://localhost:27017/paypalCloneDB', { useNewUrlParser: true, useUnifiedTopology: true });
+
+const userSchema = new mongoose.Schema({
+  email: String,
+  password: String,
+  balance: Number
+});
+
+const User = mongoose.model('User', userSchema);
+
+// Routes
+app.get('/', (req, res) => {
+  res.render('index');
+});
+
+app.get('/register', (req, res) => {
+  res.render('register');
+});
+
+app.post('/register', async (req, res) => {
+  const hashedPassword = await bcrypt.hash(req.body.password, 10);
+  const newUser = new User({
+    email: req.body.email,
+    password: hashedPassword,
+    balance: 0
+  });
+  newUser.save(err => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.redirect('/login');
+    }
+  });
+});
+
+app.get('/login', (req, res) => {
+  res.render('login');
+});
+
+app.post('/login', (req, res) => {
+  const email = req.body.email;
+  const password = req.body.password;
+  
+  User.findOne({ email: email }, (err, foundUser) => {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        bcrypt.compare(password, foundUser.password, (err, result) => {
+          if (result === true) {
+            const token = jwt.sign({ id: foundUser._id }, process.env.SECRET, { expiresIn: '1h' });
+            res.cookie('authToken', token, { httpOnly: true });
+            res.redirect('/transaction');
+          } else {
+            res.send('Incorrect password.');
+          }
+        });
+      } else {
+        res.send('No user found with that email.');
+      }
+    }
+  });
+});
+
+app.get('/transaction', authenticateToken, (req, res) => {
+  User.findById(req.user.id, (err, foundUser) => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.render('transaction', { user: foundUser });
+    }
+  });
+});
+
+app.post('/transaction', authenticateToken, (req, res) => {
+  const amount = parseFloat(req.body.amount);
+
+  User.findById(req.user.id, (err, foundUser) => {
+    if (err) {
+      console.log(err);
+    } else {
+      foundUser.balance += amount;
+      foundUser.save(err => {
+        if (err) {
+          console.log(err);
+        } else {
+          res.redirect('/transaction');
+        }
+      });
+    }
+  });
+});
+
+function authenticateToken(req, res, next) {
+  const token = req.cookies.authToken;
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
+
+app.listen(3000, () => {
+  console.log('Server started on port 3000');
+});
+
+SECRET=your_jwt_secret
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My PayPal Clone</title>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css">
+</head>
+<body>
+  <h1>Welcome to My PayPal Clone</h1>
+  <a href="/register">Register</a>
+  <a href="/login">Login</a>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register</title>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css">
+</head>
+<body>
+  <h1>Register</h1>
+  <form action="/register" method="post">
+    <label for="email">Email:</label>
+    <input type="email" name="email" required>
+    <br>
+    <label for="password">Password:</label>
+    <input type="password" name="password" required>
+    <br>
+    <button type="submit">Register</button>
+  </form>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css">
+</head>
+<body>
+  <h1>Login</h1>
+  <form action="/login" method="post">
+    <label for="email">Email:</label>
+    <input type="email" name="email" required>
+    <br>
+    <label for="password">Password:</label>
+    <input type="password" name="password" required>
+    <br>
+    <button type="submit">Login</button>
+  </form>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Transaction</title>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css">
+</head>
+<body>
+  <h1>Transaction</h1>
+  <p>Welcome, <%= user.email %></p>
+  <p>Your balance: $<%= user.balance %></p>
+  <form action="/transaction" method="post">
+    <label for="amount">Amount:</label>
+    <input type="number" name="amount" step="0.01" required>
+    <br>
+    <button type="submit">Add Funds</button>
+  </form>
+</body>
+</html>
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: #f0f0f0;
+}
+
+h1 {
+  color: #333;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+label, input {
+  margin: 5px 0;
+}
+
+button {
+  margin-top: 10px;
+}
+
+node app.js
+
+Open browser and navigate to http://localhost:3000.
